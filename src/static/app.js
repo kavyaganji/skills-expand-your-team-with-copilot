@@ -553,6 +553,9 @@ document.addEventListener("DOMContentLoaded", () => {
         </ul>
       </div>
       <div class="activity-card-actions">
+        <button class="share-button" data-activity="${name}" aria-label="Share ${name}">
+          🔗 Share
+        </button>
         ${
           currentUser
             ? `
@@ -587,7 +590,44 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
+    // Add click handler for share button
+    const shareButton = activityCard.querySelector(".share-button");
+    shareButton.addEventListener("click", () => {
+      shareActivity(name, details);
+    });
+
     activitiesList.appendChild(activityCard);
+  }
+
+  // Share an activity via Web Share API or clipboard fallback
+  async function shareActivity(name, details) {
+    const shareUrl =
+      `${window.location.origin}${window.location.pathname}` +
+      `?activity=${encodeURIComponent(name)}`;
+    const formattedSchedule = formatSchedule(details);
+    const shareData = {
+      title: `${name} – Mergington High School`,
+      text: `Check out this activity: ${name}\n${details.description}\nSchedule: ${formattedSchedule}`,
+      url: shareUrl,
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          console.error("Error sharing:", error);
+        }
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        showMessage(`Link for "${name}" copied to clipboard!`, "success");
+      } catch (error) {
+        console.error("Clipboard error:", error);
+        showMessage("Could not copy link. Please copy the URL manually.", "error");
+      }
+    }
   }
 
   // Event listeners for search and filter
@@ -864,5 +904,19 @@ document.addEventListener("DOMContentLoaded", () => {
   // Initialize app
   checkAuthentication();
   initializeFilters();
-  fetchActivities();
+  fetchActivities().then(() => {
+    // Highlight activity if shared via URL param
+    const params = new URLSearchParams(window.location.search);
+    const sharedActivity = params.get("activity");
+    if (sharedActivity) {
+      const cards = activitiesList.querySelectorAll(".activity-card");
+      cards.forEach((card) => {
+        const heading = card.querySelector("h4");
+        if (heading && heading.textContent.trim() === sharedActivity) {
+          card.classList.add("highlighted");
+          card.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      });
+    }
+  });
 });
